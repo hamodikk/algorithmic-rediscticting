@@ -34,7 +34,7 @@ Additionally, we wrote a Python code using the `geopandas` library to create the
 
 ## Solution
 
-With the optimal solution, Washington state is suggested to be redistricted into 8 districts. In our original code, the program could not provide an optimal solution due to the unbalanced population allocation, especially in King County and Pierce County, which occupied 40% of the population in Washington state. Therefore, we separated the programming for those two districts and added a population tolerance of 15%. After solving the integer programming problem, we added back the two counties as their own districts.
+With the optimal solution, Washington state is suggested to be redistricted into 10 districts. In our original code, the program could not provide an optimal solution due to the unbalanced population allocation, especially in King County and Pierce County, which occupied 40% of the population in Washington state. Therefore, we separated the programming for those two counties and added a population tolerance of 15%. After solving the integer programming problem, we added back the two counties making up four districts. The specifics of the King and Pierce County segmentation are unable to be calculated by our model as it only uses county data, however our approach ensures each district will have roughly the same population.
 
 ## Maps and Discussion
 
