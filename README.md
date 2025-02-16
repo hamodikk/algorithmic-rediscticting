@@ -34,6 +34,16 @@ Additionally, we wrote a Python code using the `geopandas` library to create the
 
 ## Solution
 
-Running the PuLP code, we get the following results for the redistricting plan:
+With the optimal solution, Washington state is suggested to be redistricted into 8 districts. In our original code, the program could not provide an optimal solution due to the unbalanced population allocation, especially in King County and Pierce County, which occupied 40% of the population in Washington state. Therefore, we separated the programming for those two districts and added a population tolerance of 15%. After solving the integer programming problem, we added back the two counties as their own districts.
 
 ## Maps and Discussion
+
+Here is the current Washington congressional districts map:
+
+![Current_WA_District_Plan](WA_district_map.png)
+
+Running the PuLP code, we get the following results for the redistricting plan:
+
+![redistricted_map](redistricted_map.png)
+
+Redistricted districts may not be adjacent, unlike the current map. As the program considers the fairness of population distribution to ensure one person, one vote, the geographic distribution may be inconsistent and non-adjacent. A disadvantage of this solution might be confusion for people when voting and increased administrative or management expenses for the local government.
