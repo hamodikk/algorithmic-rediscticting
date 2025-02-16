@@ -11,7 +11,7 @@ except FileNotFoundError:
     print("Population data file not found. Please provide the correct path.")
     exit()
 
-# REMOVE King and Pierce counties *BEFORE* creating adjacency matrix
+# Remove King and Pierce counties before creating adjacency matrix
 remove_counties = ["King County", "Pierce County"]
 king_pierce_data = county_data[county_data['name'].isin(remove_counties)].copy()
 county_data = county_data[~county_data['name'].isin(remove_counties)]
@@ -24,39 +24,40 @@ response.raise_for_status()
 county_adjacency_data = pd.read_csv(StringIO(response.text), sep="\t", header=None)
 county_adjacency_data.columns = ['County1_Name', 'FIPS1', 'County2_Name', 'FIPS2']
 
+# --- Add ", WA" to county names in county_data for matching ---
+county_data['name_with_state'] = county_data['name'] + ", WA"  # Add ", WA"
+county_names_list_with_state = sorted(county_data['name_with_state'].tolist())
 
-# --- CRITICAL FIX: Ensure consistent county order AND preserve county names ---
-county_names_list = sorted(county_data['name'].tolist())  # Get the sorted list of county names
+county_data = county_data.set_index('name_with_state')
+county_data = county_data.loc[county_names_list_with_state]
+county_names_df = pd.DataFrame({'name': county_names_list_with_state})
 
-# Create a *separate* DataFrame to hold the names
-county_names_df = pd.DataFrame({'name': county_names_list})
 
-county_data = county_data.set_index('name')  # Set the index of county_data to the county names.
-county_data = county_data.loc[county_names_list]  # Reorder county_data based on sorted list.
+# Create adjacency matrix (using COUNTY NAMES *WITH STATE* and AFTER county removal)
+adjacency_matrix = pd.DataFrame(0, index=county_names_list_with_state, columns=county_names_list_with_state, dtype=int)
 
-# Create adjacency matrix (using COUNTY NAMES and AFTER county removal)
-adjacency_matrix = pd.DataFrame(0, index=county_names_list, columns=county_names_list, dtype=int)
+mandate_adjacency = False
+if mandate_adjacency:
+    for county1_name in county_names_list_with_state:
+        for county2_name in county_names_list_with_state:
+            if county1_name != county2_name:
+                adjacency_check = county_adjacency_data[
+                    ((county_adjacency_data['County1_Name'] == county1_name) & (county_adjacency_data['County2_Name'] == county2_name)) |
+                    ((county_adjacency_data['County1_Name'] == county2_name) & (county_adjacency_data['County2_Name'] == county1_name))
+                ]
+                if not adjacency_check.empty:
+                    adjacency_matrix.loc[county1_name, county2_name] = 1
+                    adjacency_matrix.loc[county2_name, county1_name] = 1
 
-for county1_name in county_names_list:
-    for county2_name in county_names_list:
-        if county1_name != county2_name:
-            is_adjacent = county_adjacency_data[
-                ((county_adjacency_data['County1_Name'] == county1_name) & (county_adjacency_data['County2_Name'] == county2_name)) |
-                ((county_adjacency_data['County1_Name'] == county2_name) & (county_adjacency_data['County2_Name'] == county1_name))
-            ].any().any()
-
-            if is_adjacent:
-                adjacency_matrix.loc[county1_name, county2_name] = 1
 
 # Set ideal population and number of districts (after county removal)
 state_population = county_data['pop2024'].sum()
-desired_district_population = 750000 #Adjust as needed
+# desired_district_population = 750000 #Adjust as needed
 num_districts = 6  # 6 Districts for the remaining counties
 ideal_population = state_population / num_districts
 
 
-def optimal_redistricting(county_data, adjacency_matrix, ideal_population, pop_deviation_tolerance=0.15, county_names_df=None):
-    num_counties = len(county_data)
+def optimal_redistricting(county_data, adjacency_matrix, ideal_population, pop_deviation_tolerance=0.10, county_names_df=None):
     prob = pulp.LpProblem("Redistricting Problem", pulp.LpMinimize)
 
     x = pulp.LpVariable.dicts("County_District", (county_data.index, range(num_districts)), cat='Binary')
@@ -79,6 +80,7 @@ def optimal_redistricting(county_data, adjacency_matrix, ideal_population, pop_d
     # Improved Contiguity Constraint (Stricter and using county names)
     for county1_name in county_data.index:
         for county2_name in county_data.index:
+            print(adjacency_matrix.loc[county1_name, county2_name])
             if county1_name != county2_name and adjacency_matrix.loc[county1_name, county2_name] == 1:
                 for d in range(num_districts):
                     prob += x[county1_name][d] - x[county2_name][d] <= 0
@@ -107,7 +109,7 @@ def optimal_redistricting(county_data, adjacency_matrix, ideal_population, pop_d
 
 # Run redistricting
 new_county_data, objective_value = optimal_redistricting(county_data, adjacency_matrix, ideal_population,
-                                                         pop_deviation_tolerance=0.15, county_names_df=county_names_df)  # Adjust tolerance as needed
+                                                         pop_deviation_tolerance=0.10, county_names_df=county_names_df)
 
 
 # --- Combine results (including hardcoded King/Pierce) ---
@@ -115,7 +117,7 @@ if new_county_data is not None and not new_county_data.empty:
     #King and Pierce are already assigned to 4 districts. No need to add them
     print(new_county_data)
     print("Objective Function Value:", objective_value)
-    new_county_data.to_csv("redistricted_counties.csv", index=False) #Save only the new counties
+    new_county_data.to_csv("redistricted_counties.csv", index=False)
 else:
     #No new_county_data, then something went wrong.
     print("Optimization failed.")
